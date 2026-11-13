@@ -1,0 +1,103 @@
+/* UniMeet Authentication Pages Stylesheet */
+
+.auth-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  background: var(--color-bg-light);
+}
+
+.auth-aside {
+  background-color: var(--color-bg-dark);
+  background-image:
+    linear-gradient(to right, rgba(246, 245, 241, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(246, 245, 241, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  color: #f6f5f1;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.auth-aside h1,
+.auth-aside h2,
+.auth-aside p {
+  color: #f6f5f1;
+}
+
+.auth-aside p {
+  opacity: 0.84;
+}
+
+.auth-aside .brand-wordmark {
+  color: #f6f5f1;
+}
+
+.auth-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 470px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+}
+
+.password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrap input {
+  padding-right: 4.5rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.45rem;
+  min-height: 36px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border-radius: var(--radius-xs);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pw-rules {
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.pw-rules li.is-met {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.demo-box {
+  margin-top: 1.25rem;
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-secondary-tint);
+  border: 1px solid var(--color-secondary-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

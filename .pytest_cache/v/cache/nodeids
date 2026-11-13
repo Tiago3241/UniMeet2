@@ -1,0 +1,16 @@
+[
+  "backend/tests/test_auth_and_users.py::test_duplicate_registration_and_invalid_credentials",
+  "backend/tests/test_auth_and_users.py::test_profile_edit_interests_and_privacy",
+  "backend/tests/test_auth_and_users.py::test_register_login_logout_and_me",
+  "backend/tests/test_auth_and_users.py::test_reset_demo_account_defaults",
+  "backend/tests/test_auth_and_users.py::test_user_hobbies_crud_and_discovery",
+  "backend/tests/test_events.py::test_event_crud_capacity_and_duplicate_likes",
+  "backend/tests/test_health.py::test_cors_headers_for_allowed_origin",
+  "backend/tests/test_health.py::test_health_endpoint",
+  "backend/tests/test_health.py::test_openapi_docs_available",
+  "backend/tests/test_health.py::test_sqlite_foreign_keys_enabled",
+  "backend/tests/test_social_journeys.py::test_journey_a_and_d_matching_compatibility_and_websocket_chat",
+  "backend/tests/test_social_journeys.py::test_journey_b_going_solo_and_expiry",
+  "backend/tests/test_social_journeys.py::test_journey_c_groups_and_capacity",
+  "backend/tests/test_social_journeys.py::test_journey_e_blocking_reporting_and_community"
+]
