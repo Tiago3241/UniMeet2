@@ -186,7 +186,6 @@ function renderMatchesView() {
       }
       try {
         await API.deleteMatch(Number(btn.dataset.unmatchId));
-        showToast("Match removed.", "info");
         loadMatches();
       } catch (err) {
         showToast(err.message, "error");
@@ -198,7 +197,6 @@ function renderMatchesView() {
     btn.addEventListener("click", async () => {
       try {
         await API.unlikeEvent(Number(btn.dataset.unlikeEventId));
-        showToast("Removed event from Matches.", "info");
         loadMatches();
       } catch (err) {
         showToast(err.message, "error");

@@ -2,21 +2,34 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
 from app.schemas import MessageResponse
-from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, UserPrivateOut
+from app.schemas.auth import (
+    AuthResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    RegisterRequest,
+    ResetPasswordRequest,
+    UserPrivateOut,
+)
 from app.security.auth import (
     clear_auth_cookies,
     create_access_token,
+    create_password_reset_token,
+    decode_password_reset_token,
     get_current_user,
     hash_password,
+    password_fingerprint,
     set_auth_cookies,
     verify_password,
 )
 from app.services.serializers import user_to_private
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+settings = get_settings()
 
 
 @router.post(
@@ -118,6 +131,61 @@ def login(
         token_type="bearer",
         csrf_token=csrf_token,
     )
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="Request a password reset link",
+)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email.ilike(normalized_email)).first()
+
+    reset_token = None
+    reset_url = None
+    if user and user.is_active:
+        reset_token = create_password_reset_token(user, ttl_minutes=30)
+        reset_url = f"login.html?mode=reset&token={reset_token}"
+
+    return ForgotPasswordResponse(
+        message="If an active UniMeet account matches that email, a password reset link is ready below.",
+        reset_token=reset_token if settings.ENVIRONMENT != "production" else None,
+        reset_url=reset_url if settings.ENVIRONMENT != "production" else None,
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Reset password using a single-use reset token",
+)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    decoded = decode_password_reset_token(payload.token.strip())
+    if decoded is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This password reset link is invalid or has expired.",
+        )
+
+    user_id, expected_fp = decoded
+    user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
+    if not user or password_fingerprint(user.hashed_password) != expected_fp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This password reset link is invalid or has already been used.",
+        )
+
+    user.hashed_password = hash_password(payload.new_password)
+    db.add(user)
+    db.commit()
+    return MessageResponse(message="Password updated successfully. You can now sign in with your new password.")
 
 
 @router.post(

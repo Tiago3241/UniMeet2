@@ -206,7 +206,8 @@ function renderHobbiesSection() {
         (h, i) => i !== idx && h.toLowerCase() === nextName.toLowerCase()
       );
       if (duplicateIdx !== -1) {
-        showToast("You already have that hobby in your list.", "info");
+        const statusEl = qs("#hobbies-sync-status", host);
+        if (statusEl) statusEl.textContent = "Already in list";
         return;
       }
       const updated = [...profileState.hobbies];
@@ -250,8 +251,9 @@ function renderHobbiesSection() {
       return;
     }
     if (profileState.hobbies.some((h) => h.toLowerCase() === cleaned.toLowerCase())) {
-      showToast(`"${cleaned}" is already in your hobbies.`, "info");
       input.value = "";
+      const statusEl = qs("#hobbies-sync-status", host);
+      if (statusEl) statusEl.textContent = "Already added";
       return;
     }
     if (profileState.hobbies.length >= 20) {
@@ -409,7 +411,10 @@ async function renderOverviewTab() {
               <textarea id="pe-bio" rows="3" maxlength="1000" placeholder="Tell students what events you enjoy...">${escapeHtml(u.bio || "")}</textarea>
             </div>
 
-            <button type="submit" class="btn btn-primary" id="pe-save-btn">Save profile</button>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+              <button type="submit" class="btn btn-primary" id="pe-save-btn">Save profile</button>
+              <span class="muted-small status-text-success" id="profile-save-status" aria-live="polite"></span>
+            </div>
           </form>
         </div>
       </section>
@@ -477,8 +482,9 @@ async function renderOverviewTab() {
         hobbies: profileState.hobbies,
       });
       renderDashboardShell(profileState.user);
-      showToast("Profile updated!", "success");
-      renderOverviewTab();
+      await renderOverviewTab();
+      const statusEl = qs("#profile-save-status", qs("#profile-content"));
+      if (statusEl) statusEl.textContent = "Saved";
     } catch (err) {
       showToast(err.message, "error");
       btn.disabled = false;
@@ -513,7 +519,10 @@ async function renderInterestsTab() {
           <h2>Select your interests</h2>
           <p>Interests power 60% of your UniMeet compatibility score.</p>
           <div class="chip-grid" style="margin:1.25rem 0;">${chips}</div>
-          <button type="button" class="btn btn-primary" id="save-interests-btn">Save interests</button>
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="save-interests-btn">Save interests</button>
+            <span class="muted-small status-text-success" id="interests-save-status" aria-live="polite"></span>
+          </div>
         </div>
       </section>
     `;
@@ -533,12 +542,14 @@ async function renderInterestsTab() {
 
     qs("#save-interests-btn", container).addEventListener("click", async () => {
       const btn = qs("#save-interests-btn", container);
+      const statusEl = qs("#interests-save-status", container);
       btn.disabled = true;
       btn.textContent = "Saving...";
+      if (statusEl) statusEl.textContent = "";
       try {
         const updated = await API.updateMyInterests(Array.from(profileState.selectedInterestIds));
         profileState.user.interests = updated.selected_interests;
-        showToast("Interests saved!", "success");
+        if (statusEl) statusEl.textContent = "Saved";
       } catch (err) {
         showToast(err.message, "error");
       } finally {
@@ -596,7 +607,6 @@ async function renderBlockedTab() {
       btn.addEventListener("click", async () => {
         try {
           await API.unblockUser(Number(btn.dataset.unblockId));
-          showToast("User unblocked.", "success");
           renderBlockedTab();
         } catch (err) {
           showToast(err.message, "error");

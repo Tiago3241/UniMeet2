@@ -116,7 +116,7 @@ export function renderMediaWithFallback(imageUrl, altText, fallbackTitle, extraC
   `;
 }
 
-export function openModal({ title, bodyHtml, onMount }) {
+export function openModal({ title, bodyHtml, headerActionsHtml = "", onMount }) {
   closeActiveModal();
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -125,7 +125,10 @@ export function openModal({ title, bodyHtml, onMount }) {
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
       <div class="modal-header">
         <h2 id="modal-title-text" class="modal-title">${escapeHtml(title)}</h2>
-        <button type="button" class="icon-btn" id="modal-close-btn" aria-label="Close modal">&times;</button>
+        <div class="modal-header-actions">
+          ${headerActionsHtml}
+          <button type="button" class="icon-btn" id="modal-close-btn" aria-label="Close modal">&times;</button>
+        </div>
       </div>
       <div class="modal-body">${bodyHtml}</div>
     </div>
@@ -150,6 +153,56 @@ export function openModal({ title, bodyHtml, onMount }) {
     onMount(backdrop, close);
   }
   return close;
+}
+
+export function openConfirmDialog({
+  title = "Confirm action",
+  message,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  destructive = true,
+  onConfirm,
+}) {
+  return openModal({
+    title,
+    bodyHtml: `
+      <div>
+        <p style="margin-bottom: 1.25rem;">${escapeHtml(message)}</p>
+        <div id="confirm-dialog-error" class="form-alert form-alert-error" hidden style="margin-bottom: 1rem;"></div>
+        <div class="card-actions" style="justify-content: flex-end; margin-top: 0;">
+          <button type="button" class="btn btn-secondary" id="confirm-cancel-btn">${escapeHtml(cancelLabel)}</button>
+          <button type="button" class="btn ${destructive ? "btn-danger" : "btn-primary"}" id="confirm-proceed-btn">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>
+    `,
+    onMount: (root, close) => {
+      const cancelBtn = qs("#confirm-cancel-btn", root);
+      const proceedBtn = qs("#confirm-proceed-btn", root);
+      const errEl = qs("#confirm-dialog-error", root);
+
+      cancelBtn.addEventListener("click", close);
+      proceedBtn.addEventListener("click", async () => {
+        if (typeof onConfirm !== "function") {
+          close();
+          return;
+        }
+        proceedBtn.disabled = true;
+        cancelBtn.disabled = true;
+        const originalText = proceedBtn.textContent;
+        proceedBtn.textContent = "Working...";
+        errEl.hidden = true;
+        try {
+          await onConfirm(close);
+        } catch (err) {
+          errEl.hidden = false;
+          errEl.textContent = err?.message || "Could not complete action.";
+          proceedBtn.disabled = false;
+          cancelBtn.disabled = false;
+          proceedBtn.textContent = originalText;
+        }
+      });
+    },
+  });
 }
 
 export function closeActiveModal() {

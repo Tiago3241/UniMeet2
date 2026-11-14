@@ -260,3 +260,46 @@ def test_journey_e_blocking_reporting_and_community(client, db_session):
     mod_reports = client.get("/api/safety/reports", headers=h1)
     assert mod_reports.status_code == 200
     assert len(mod_reports.json()) == 1
+
+
+def test_message_unsend_and_delete_for_me(client):
+    u1 = register_user(client, username="msg_sender", email="ms1@upt.ro").json()
+    u2 = register_user(client, username="msg_peer", email="ms2@upt.ro").json()
+    h1 = {"Authorization": f"Bearer {u1['access_token']}"}
+    h2 = {"Authorization": f"Bearer {u2['access_token']}"}
+
+    grp = client.post(
+        "/api/groups",
+        headers=h1,
+        json={"name": "Message Test Group", "description": "Testing unsend & delete for me.", "max_members": 5, "is_public": True},
+    ).json()
+    client.post(f"/api/groups/{grp['id']}/join", headers=h2)
+    conv_id = grp["conversation_id"]
+
+    m1 = client.post(f"/api/messages/conversations/{conv_id}/messages", headers=h1, json={"content": "First secret note"}).json()
+    m2 = client.post(f"/api/messages/conversations/{conv_id}/messages", headers=h2, json={"content": "Peer reply here"}).json()
+
+    # Peer cannot unsend sender's message
+    forbidden_unsend = client.post(f"/api/messages/{m1['id']}/unsend", headers=h2)
+    assert forbidden_unsend.status_code == 403
+
+    # Sender unsends m1 -> both users see placeholder
+    unsent = client.post(f"/api/messages/{m1['id']}/unsend", headers=h1)
+    assert unsent.status_code == 200
+    assert unsent.json()["is_unsent"] is True
+    assert unsent.json()["content"] == "This message was unsent"
+
+    peer_view = client.get(f"/api/messages/conversations/{conv_id}", headers=h2).json()
+    assert peer_view["messages"][0]["content"] == "This message was unsent"
+    assert peer_view["messages"][0]["is_unsent"] is True
+
+    # Sender deletes m2 only for themselves -> sender doesn't see m2, peer still sees m2
+    del_me = client.post(f"/api/messages/{m2['id']}/delete-for-me", headers=h1)
+    assert del_me.status_code == 200
+
+    sender_msgs = client.get(f"/api/messages/conversations/{conv_id}", headers=h1).json()["messages"]
+    assert [m["id"] for m in sender_msgs] == [m1["id"]]
+
+    peer_msgs = client.get(f"/api/messages/conversations/{conv_id}", headers=h2).json()["messages"]
+    assert [m["id"] for m in peer_msgs] == [m1["id"], m2["id"]]
+

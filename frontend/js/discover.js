@@ -366,7 +366,6 @@ async function handleSwipe(direction) {
 
   const key = `${state.activeTab}:${item.id}`;
   if (direction === "right" && state.actedIds.has(key)) {
-    showToast("Already liked this item.", "info");
     state.cards.shift();
     renderTopCard();
     return;
@@ -393,7 +392,6 @@ async function handleSwipe(direction) {
 
       if (state.activeTab === "events") {
         await API.likeEvent(item.id);
-        showToast(`Saved "${item.title}" to Matches & creator messaged you!`, "success");
       } else if (state.activeTab === "people") {
         const eventId = Number(qs("#disc-event-context").value);
         if (!eventId) {
@@ -404,23 +402,13 @@ async function handleSwipe(direction) {
         const res = await API.likeUser(item.id, eventId);
         if (res.is_match && res.match) {
           showMatchCelebration(res.match);
-        } else {
-          showToast(`Like sent to ${item.first_name}. Waiting for mutual like!`, "success");
         }
       } else if (state.activeTab === "groups") {
-        const grp = await API.joinGroup(item.id);
-        showToast(
-          grp.membership_status === "pending"
-            ? `Join request sent to ${item.name}.`
-            : `Joined ${item.name}!`,
-          "success"
-        );
+        await API.joinGroup(item.id);
       } else if (state.activeTab === "solo") {
         const res = await API.expressSoloInterest(item.id);
-        showToast("Connected! Opening chat with your solo companion...", "success");
-        window.setTimeout(() => {
-          window.location.href = `messages.html?conversation=${res.conversation_id}`;
-        }, 500);
+        window.location.href = `messages.html?conversation=${res.conversation_id}`;
+        return;
       }
       state.actedIds.add(key);
     }
@@ -433,7 +421,6 @@ async function handleSwipe(direction) {
     if (cardEl) cardEl.classList.remove("exit-right", "exit-left");
     if (err.status === 409) {
       state.actedIds.add(key);
-      showToast(err.message, "info");
       state.cards.shift();
       renderTopCard();
     } else {
@@ -557,7 +544,6 @@ function openSoloModal() {
             message: qs("#ms-msg", root).value.trim(),
             expires_hours: Number(qs("#ms-exp", root).value),
           });
-          showToast("Going Solo announcement posted!", "success");
           close();
           if (state.activeTab === "solo") loadDeck();
         } catch (err) {

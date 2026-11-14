@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 import secrets
 from typing import Dict, Optional, Tuple
 
@@ -61,6 +62,40 @@ def decode_access_token(token: str) -> Optional[int]:
             return None
         sub = payload.get("sub")
         return int(sub) if sub is not None else None
+    except (InvalidTokenError, ValueError, TypeError):
+        return None
+
+
+def password_fingerprint(hashed_password: str) -> str:
+    return hashlib.sha256(hashed_password.encode("utf-8")).hexdigest()[:16]
+
+
+def create_password_reset_token(user: User, ttl_minutes: int = 30) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user.id),
+        "pw_fp": password_fingerprint(user.hashed_password),
+        "iat": now,
+        "exp": now + timedelta(minutes=ttl_minutes),
+        "type": "password_reset",
+    }
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def decode_password_reset_token(token: str) -> Optional[Tuple[int, str]]:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+        )
+        if payload.get("type") != "password_reset":
+            return None
+        sub = payload.get("sub")
+        pw_fp = payload.get("pw_fp")
+        if sub is None or not pw_fp:
+            return None
+        return int(sub), str(pw_fp)
     except (InvalidTokenError, ValueError, TypeError):
         return None
 

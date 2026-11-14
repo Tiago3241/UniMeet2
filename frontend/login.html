@@ -30,10 +30,11 @@
 
     <main id="main-content" class="auth-panel">
       <div class="auth-card">
-        <h1 style="font-size: 1.75rem;">Sign in to UniMeet</h1>
-        <p>Use your email or username and password.</p>
+        <h1 id="auth-heading" style="font-size: 1.75rem;">Sign in to UniMeet</h1>
+        <p id="auth-subheading">Use your email or username and password.</p>
 
-        <div id="auth-feedback" class="form-alert" hidden></div>
+        <div id="auth-feedback" class="form-alert" hidden style="margin-bottom: 1rem;"></div>
+        <div id="reset-link-box" class="demo-box" hidden style="margin-top: 0; margin-bottom: 1rem;"></div>
 
         <form id="login-form" class="stack-form" novalidate>
           <div class="field">
@@ -43,7 +44,10 @@
           </div>
 
           <div class="field">
-            <label for="login-password">Password</label>
+            <div class="field-label-row">
+              <label for="login-password">Password</label>
+              <button type="button" class="link-btn" id="open-forgot-btn">Forgot password?</button>
+            </div>
             <div class="password-wrap">
               <input id="login-password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password">
               <button type="button" class="password-toggle" data-toggle-pw="login-password" aria-label="Show password">Show</button>
@@ -54,7 +58,46 @@
           <button type="submit" class="btn btn-primary btn-full" id="login-submit-btn">Sign in</button>
         </form>
 
-        <div class="demo-box">
+        <form id="forgot-form" class="stack-form" novalidate hidden>
+          <div class="field">
+            <label for="forgot-email">Account email address</label>
+            <input id="forgot-email" name="email" type="email" autocomplete="email" required placeholder="elena.demo@unimeet.edu">
+            <span class="field-error" id="err-forgot-email"></span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="forgot-submit-btn">Send reset link</button>
+          <button type="button" class="btn btn-secondary btn-full" id="back-to-login-from-forgot">Back to sign in</button>
+        </form>
+
+        <form id="reset-form" class="stack-form" novalidate hidden>
+          <div class="field">
+            <label for="reset-new-password">New password</label>
+            <div class="password-wrap">
+              <input id="reset-new-password" name="new_password" type="password" autocomplete="new-password" required placeholder="At least 8 chars with letter & number">
+              <button type="button" class="password-toggle" data-toggle-pw="reset-new-password" aria-label="Show password">Show</button>
+            </div>
+            <ul class="pw-rules" aria-live="polite">
+              <li id="reset-rule-len">At least 8 characters</li>
+              <li id="reset-rule-letter">At least 1 letter</li>
+              <li id="reset-rule-digit">At least 1 number</li>
+            </ul>
+            <span class="field-error" id="err-reset-password"></span>
+          </div>
+
+          <div class="field">
+            <label for="reset-confirm-password">Confirm new password</label>
+            <div class="password-wrap">
+              <input id="reset-confirm-password" name="confirm_password" type="password" autocomplete="new-password" required placeholder="Re-enter your new password">
+              <button type="button" class="password-toggle" data-toggle-pw="reset-confirm-password" aria-label="Show password">Show</button>
+            </div>
+            <span class="field-error" id="err-reset-confirm"></span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full" id="reset-submit-btn">Update password</button>
+          <button type="button" class="btn btn-secondary btn-full" id="back-to-login-from-reset">Back to sign in</button>
+        </form>
+
+        <div class="demo-box" id="demo-credentials-box">
           <strong>Seeded demo account (for quick testing)</strong>
           <span class="muted-small">Email: <code>elena.demo@unimeet.edu</code> · Password: <code>DemoUser123!</code></span>
           <button type="button" class="btn btn-secondary btn-sm" id="fill-demo-btn">Fill demo credentials</button>

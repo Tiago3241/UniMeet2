@@ -143,12 +143,14 @@ class MessageOut(BaseModel):
     content: str
     created_at: datetime
     is_read: bool
+    is_unsent: bool = False
 
 
 class ConversationOut(BaseModel):
     id: int
     match_id: Optional[int] = None
     group_id: Optional[int] = None
+    group_creator_id: Optional[int] = None
     title: str
     other_user: Optional[UserPublicOut] = None
     last_message: Optional[str] = None

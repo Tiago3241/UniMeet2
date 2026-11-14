@@ -1,19 +1,20 @@
 /**
- * Navigation shell (Landing header/footer + Dashboard desktop sidebar & mobile top/bottom bars),
- * shared current-user session state, Public Profile modal, and Safety Block/Report modal helpers.
+ * Navigation shell (Landing header/footer + Dashboard desktop sidebar, mobile top/bottom bars,
+ * and slide-out mobile drawer), shared current-user session state, Public Profile modal,
+ * Safety Block/Report modal, and shared Group 3-dot options menu.
  */
 import { API, getFallbackToken, setFallbackToken } from "./api.js";
 import { CONFIG } from "./config.js";
-import { escapeHtml, getCookie, getInitials, openModal, qs, showToast } from "./utils.js";
+import { escapeHtml, getCookie, getInitials, openConfirmDialog, openModal, qs, qsa, showToast } from "./utils.js";
 
 export const NAV_ITEMS = [
-  { id: "discover", label: "Discover", href: "discover.html", icon: "compass" },
-  { id: "events", label: "Events", href: "events.html", icon: "calendar" },
-  { id: "groups", label: "Groups", href: "groups.html", icon: "users" },
-  { id: "matches", label: "Matches", href: "matches.html", icon: "heart" },
-  { id: "messages", label: "Messages", href: "messages.html", icon: "message" },
-  { id: "profile", label: "Profile", href: "profile.html", icon: "user" },
-  { id: "settings", label: "Settings", href: "settings.html", icon: "settings" },
+  { id: "discover", label: "Discover", href: "discover.html", icon: "compass", group: "Explore" },
+  { id: "events", label: "Events", href: "events.html", icon: "calendar", group: "Explore" },
+  { id: "groups", label: "Groups", href: "groups.html", icon: "users", group: "Explore" },
+  { id: "matches", label: "Matches", href: "matches.html", icon: "heart", group: "Social" },
+  { id: "messages", label: "Messages", href: "messages.html", icon: "message", group: "Social" },
+  { id: "profile", label: "Profile", href: "profile.html", icon: "user", group: "Account" },
+  { id: "settings", label: "Settings", href: "settings.html", icon: "settings", group: "Account" },
 ];
 
 export const MOBILE_NAV_ITEMS = [
@@ -41,6 +42,16 @@ const ICONS = {
     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   plus:
     '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+  menu:
+    '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
+  dotsVertical:
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>',
+  leave:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  block:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+  flag:
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>',
 };
 
 let cachedUserPromise = null;
@@ -189,10 +200,124 @@ export function renderLandingHeader(user) {
   }
 }
 
+function renderMobileDrawer(user, activePage) {
+  let backdrop = qs("#mobile-nav-backdrop");
+  let drawer = qs("#mobile-nav-drawer");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.id = "mobile-nav-backdrop";
+    backdrop.className = "mobile-nav-backdrop";
+    backdrop.setAttribute("aria-hidden", "true");
+    document.body.appendChild(backdrop);
+  }
+  if (!drawer) {
+    drawer = document.createElement("aside");
+    drawer.id = "mobile-nav-drawer";
+    drawer.className = "mobile-nav-drawer";
+    drawer.setAttribute("aria-label", "Mobile menu");
+    drawer.setAttribute("aria-hidden", "true");
+    document.body.appendChild(drawer);
+  }
+
+  const isCreateOutingPage = activePage === "create-event";
+  const sections = ["Explore", "Social", "Account"];
+  const sectionHtml = sections
+    .map((sec) => {
+      const links = NAV_ITEMS.filter((i) => i.group === sec)
+        .map(
+          (item) => `
+          <a href="${item.href}" class="mobile-drawer-link ${activePage === item.id ? "is-active" : ""}">
+            ${ICONS[item.icon] || ""}
+            <span>${item.label}</span>
+          </a>
+        `
+        )
+        .join("");
+      return `
+        <div class="mobile-drawer-section">
+          <div class="mobile-drawer-section-label">${sec}</div>
+          ${links}
+        </div>
+      `;
+    })
+    .join("");
+
+  const drawerFooter = user
+    ? `
+      <div class="mobile-drawer-footer">
+        <div style="display:flex;align-items:center;gap:0.65rem;min-width:0;">
+          <div class="avatar-circle">${escapeHtml(getInitials(user.first_name, user.last_name))}</div>
+          <div style="min-width:0;">
+            <strong class="truncate" style="display:block;font-size:0.9rem;">${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</strong>
+            <span class="muted-small truncate" style="display:block;">${escapeHtml(user.university || user.city || `@${user.username}`)}</span>
+          </div>
+        </div>
+        <button type="button" class="btn-text-danger" id="drawer-logout-btn">Sign out</button>
+      </div>
+    `
+    : `
+      <div class="mobile-drawer-footer">
+        <a href="login.html" class="btn btn-primary btn-full">Sign in</a>
+      </div>
+    `;
+
+  drawer.innerHTML = `
+    <div class="mobile-drawer-header">
+      <a href="index.html" class="brand-wordmark">
+        <img src="assets/icons/unimeet-logo.svg" alt="" width="26" height="26">
+        <span>UniMeet</span>
+      </a>
+      <button type="button" class="icon-btn" id="mobile-drawer-close-btn" aria-label="Close navigation menu">&times;</button>
+    </div>
+    ${
+      isCreateOutingPage
+        ? ""
+        : `<a href="create-event.html" class="btn btn-primary btn-full" id="drawer-create-outing-btn">Create an outing</a>`
+    }
+    ${sectionHtml}
+    ${drawerFooter}
+  `;
+
+  const closeDrawer = () => {
+    drawer.classList.remove("is-open");
+    backdrop.classList.remove("is-open");
+    drawer.setAttribute("aria-hidden", "true");
+    backdrop.setAttribute("aria-hidden", "true");
+    qs("#mobile-menu-toggle-btn")?.setAttribute("aria-expanded", "false");
+  };
+
+  const openDrawer = () => {
+    drawer.classList.add("is-open");
+    backdrop.classList.add("is-open");
+    drawer.setAttribute("aria-hidden", "false");
+    backdrop.setAttribute("aria-hidden", "false");
+    qs("#mobile-menu-toggle-btn")?.setAttribute("aria-expanded", "true");
+  };
+
+  qs("#mobile-drawer-close-btn", drawer)?.addEventListener("click", closeDrawer);
+  backdrop.onclick = closeDrawer;
+  qsa("a", drawer).forEach((link) => {
+    link.addEventListener("click", closeDrawer);
+  });
+  qs("#drawer-logout-btn", drawer)?.addEventListener("click", handleLogout);
+
+  if (!document.body.dataset.drawerEscBound) {
+    document.body.dataset.drawerEscBound = "true";
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && qs("#mobile-nav-drawer")?.classList.contains("is-open")) {
+        closeDrawer();
+      }
+    });
+  }
+
+  return { openDrawer, closeDrawer };
+}
+
 export function renderDashboardShell(user) {
   const sidebar = qs("#app-sidebar");
   const bottomNav = qs("#mobile-bottom-nav");
   const activePage = document.body?.dataset?.page || "";
+  const isCreateOutingPage = activePage === "create-event";
 
   if (sidebar) {
     const navLinks = NAV_ITEMS.map(
@@ -227,7 +352,11 @@ export function renderDashboardShell(user) {
           <img src="assets/icons/unimeet-logo.svg" alt="" width="28" height="28">
           <span>UniMeet</span>
         </a>
-        <a href="create-event.html" class="btn btn-primary btn-full sidebar-cta">Create an outing</a>
+        ${
+          isCreateOutingPage
+            ? ""
+            : `<a href="create-event.html" class="btn btn-primary btn-full sidebar-cta" id="sidebar-create-outing-btn">Create an outing</a>`
+        }
         <nav class="sidebar-nav" aria-label="Dashboard sections">${navLinks}</nav>
         ${userCard}
       </div>
@@ -239,14 +368,30 @@ export function renderDashboardShell(user) {
     }
   }
 
-  // Mobile compact top bar with quick 44px links for Matches, Settings, and Create Outing
+  const drawerControls = renderMobileDrawer(user, activePage);
+
+  // Mobile compact top bar: Top-left hamburger menu + brand/title + contextual actions (hide "+" on create-event)
   const appMain = qs("#main-content");
-  if (appMain && !qs(".mobile-top-bar")) {
+  if (appMain) {
+    let mobileHeader = qs(".mobile-top-bar", appMain);
     const pageTitle = document.title.split("—")[0].trim() || "UniMeet";
-    const mobileHeader = document.createElement("header");
-    mobileHeader.className = "mobile-top-bar";
+    if (!mobileHeader) {
+      mobileHeader = document.createElement("header");
+      mobileHeader.className = "mobile-top-bar";
+      appMain.prepend(mobileHeader);
+    }
     mobileHeader.innerHTML = `
       <div class="mobile-top-left">
+        <button
+          type="button"
+          class="mobile-hamburger-btn"
+          id="mobile-menu-toggle-btn"
+          aria-label="Open navigation menu"
+          aria-controls="mobile-nav-drawer"
+          aria-expanded="false"
+        >
+          ${ICONS.menu}
+        </button>
         <a href="index.html" class="brand-wordmark" aria-label="UniMeet home">
           <img src="assets/icons/unimeet-logo.svg" alt="" width="24" height="24">
         </a>
@@ -259,12 +404,14 @@ export function renderDashboardShell(user) {
         <a href="settings.html" class="mobile-icon-link ${activePage === "settings" ? "is-active" : ""}" aria-label="Settings" title="Settings">
           ${ICONS.settings}
         </a>
-        <a href="create-event.html" class="mobile-icon-link ${activePage === "create-event" ? "is-active" : ""}" aria-label="Create outing" title="Create outing">
-          ${ICONS.plus}
-        </a>
+        ${
+          isCreateOutingPage
+            ? ""
+            : `<a href="create-event.html" class="mobile-icon-link" id="mobile-create-outing-btn" aria-label="Create outing" title="Create outing">${ICONS.plus}</a>`
+        }
       </div>
     `;
-    appMain.prepend(mobileHeader);
+    qs("#mobile-menu-toggle-btn", mobileHeader)?.addEventListener("click", drawerControls.openDrawer);
   }
 
   if (bottomNav) {
@@ -286,8 +433,274 @@ async function handleLogout() {
     // Clear local state regardless
   }
   setFallbackToken("");
-  showToast("Signed out.", "success");
   window.location.href = "login.html";
+}
+
+export function buildGroupMenuHtml(group, currentUser) {
+  const isMember = Boolean(group?.is_member);
+  const canLeave = isMember;
+  const targetable = Boolean(currentUser);
+  if (!targetable) return "";
+
+  return `
+    <div class="options-menu-wrap" data-group-menu-wrap>
+      <button
+        type="button"
+        class="options-dots-btn is-header-btn"
+        id="group-options-trigger"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-label="Group options"
+        title="Group options"
+      >
+        ${ICONS.dotsVertical}
+      </button>
+      <div class="options-dropdown" id="group-options-dropdown" role="menu" hidden>
+        ${
+          canLeave
+            ? `
+          <button type="button" class="options-dropdown-item" role="menuitem" data-group-action="leave">
+            ${ICONS.leave}
+            <span>Leave group</span>
+          </button>
+        `
+            : ""
+        }
+        <button type="button" class="options-dropdown-item" role="menuitem" data-group-action="block">
+          ${ICONS.block}
+          <span>Block</span>
+        </button>
+        <button type="button" class="options-dropdown-item is-danger" role="menuitem" data-group-action="report">
+          ${ICONS.flag}
+          <span>Report</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+export function wireGroupMenuActions({
+  container,
+  groupId,
+  groupName,
+  creatorId,
+  currentUser,
+  onLeft,
+  onBlocked,
+}) {
+  const wrap = qs("[data-group-menu-wrap]", container);
+  if (!wrap) return;
+
+  const trigger = qs("#group-options-trigger", wrap);
+  const dropdown = qs("#group-options-dropdown", wrap);
+
+  const closeMenu = () => {
+    dropdown.hidden = true;
+    trigger.setAttribute("aria-expanded", "false");
+  };
+
+  trigger.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const nextHidden = !dropdown.hidden;
+    dropdown.hidden = nextHidden;
+    trigger.setAttribute("aria-expanded", String(!nextHidden));
+  });
+
+  document.addEventListener(
+    "click",
+    (ev) => {
+      if (!wrap.isConnected) return;
+      if (!wrap.contains(ev.target)) closeMenu();
+    },
+    { capture: true }
+  );
+
+  const resolveCandidates = async () => {
+    const members = await API.getGroupMembers(groupId).catch(() => []);
+    const candidates = (members || [])
+      .map((m) => m.user)
+      .filter((u) => u && (!currentUser || u.id !== currentUser.id));
+    if (!candidates.length && creatorId && (!currentUser || creatorId !== currentUser.id)) {
+      const creatorProfile = await API.getUserProfile(creatorId).catch(() => null);
+      if (creatorProfile) candidates.push(creatorProfile);
+    }
+    return candidates;
+  };
+
+  qs('[data-group-action="leave"]', dropdown)?.addEventListener("click", () => {
+    closeMenu();
+    openConfirmDialog({
+      title: `Leave ${groupName || "group"}?`,
+      message: "You will be removed from this group and its group conversation. You can rejoin later if the group is open.",
+      confirmLabel: "Leave group",
+      destructive: true,
+      onConfirm: async (close) => {
+        await API.leaveGroup(groupId);
+        close();
+        if (typeof onLeft === "function") onLeft();
+      },
+    });
+  });
+
+  qs('[data-group-action="block"]', dropdown)?.addEventListener("click", async () => {
+    closeMenu();
+    if (!currentUser) {
+      requireAuthenticatedUser();
+      return;
+    }
+    const candidates = await resolveCandidates();
+    if (!candidates.length) {
+      showToast("No other group member is available to block.", "error");
+      return;
+    }
+
+    const defaultTarget = candidates.find((c) => c.id === creatorId) || candidates[0];
+    const optionsHtml = candidates
+      .map((u) => {
+        const label = `${u.first_name || ""} ${u.last_name || ""}`.trim() || `@${u.username}`;
+        const tag = u.id === creatorId ? " (Group host)" : "";
+        return `<option value="${u.id}">${escapeHtml(label)}${tag}</option>`;
+      })
+      .join("");
+
+    openModal({
+      title: `Block from ${groupName || "group"}`,
+      bodyHtml: `
+        <form id="group-block-form" class="stack-form">
+          <p class="muted-small">Blocking prevents this person from messaging you or appearing in your discovery, matches, and groups.</p>
+          ${
+            candidates.length > 1
+              ? `
+            <div class="field">
+              <label for="group-block-select">Select member to block</label>
+              <select id="group-block-select">${optionsHtml}</select>
+            </div>
+          `
+              : `<p><strong>Member:</strong> ${escapeHtml(`${defaultTarget.first_name} ${defaultTarget.last_name}`)}</p>`
+          }
+          <div id="group-block-error" class="form-alert form-alert-error" hidden></div>
+          <div class="card-actions" style="justify-content:flex-end;margin-top:0;">
+            <button type="button" class="btn btn-secondary" id="group-block-cancel">Cancel</button>
+            <button type="submit" class="btn btn-danger" id="group-block-submit">Block user</button>
+          </div>
+        </form>
+      `,
+      onMount: (modalRoot, close) => {
+        qs("#group-block-cancel", modalRoot).addEventListener("click", close);
+        qs("#group-block-form", modalRoot).addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const selectEl = qs("#group-block-select", modalRoot);
+          const targetId = selectEl ? Number(selectEl.value) : defaultTarget.id;
+          const submitBtn = qs("#group-block-submit", modalRoot);
+          const errEl = qs("#group-block-error", modalRoot);
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Blocking...";
+          errEl.hidden = true;
+          try {
+            await API.blockUser(targetId);
+            close();
+            if (typeof onBlocked === "function") onBlocked(targetId);
+          } catch (err) {
+            errEl.hidden = false;
+            errEl.textContent = err?.message || "Could not block user.";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Block user";
+          }
+        });
+      },
+    });
+  });
+
+  qs('[data-group-action="report"]', dropdown)?.addEventListener("click", async () => {
+    closeMenu();
+    if (!currentUser) {
+      requireAuthenticatedUser();
+      return;
+    }
+    const candidates = await resolveCandidates();
+    if (!candidates.length) {
+      showToast("No group member is available to report.", "error");
+      return;
+    }
+
+    const defaultTarget = candidates.find((c) => c.id === creatorId) || candidates[0];
+    const memberOptions = candidates
+      .map((u) => {
+        const label = `${u.first_name || ""} ${u.last_name || ""}`.trim() || `@${u.username}`;
+        const tag = u.id === creatorId ? " (Group host)" : "";
+        return `<option value="${u.id}">${escapeHtml(label)}${tag}</option>`;
+      })
+      .join("");
+    const reasonsOptions = CONFIG.REPORT_REASONS.map(
+      (r) => `<option value="${escapeHtml(r.value)}">${escapeHtml(r.label)}</option>`
+    ).join("");
+
+    openModal({
+      title: `Report ${groupName || "Group"}`,
+      bodyHtml: `
+        <form id="group-report-form" class="stack-form">
+          <p class="muted-small">Send a moderation report for review. Reports remain confidential.</p>
+          ${
+            candidates.length > 1
+              ? `
+            <div class="field">
+              <label for="group-report-user">Account to report</label>
+              <select id="group-report-user">${memberOptions}</select>
+            </div>
+          `
+              : ""
+          }
+          <div class="field">
+            <label for="group-report-reason">Reason</label>
+            <select id="group-report-reason" required>${reasonsOptions}</select>
+          </div>
+          <div class="field">
+            <label for="group-report-desc">Additional details (optional)</label>
+            <textarea id="group-report-desc" rows="3" maxlength="1500" placeholder="Share context for our moderation team..."></textarea>
+          </div>
+          <div id="group-report-feedback" class="form-alert" hidden></div>
+          <div class="card-actions" style="justify-content:flex-end;margin-top:0;">
+            <button type="button" class="btn btn-secondary" id="group-report-cancel">Close</button>
+            <button type="submit" class="btn btn-danger" id="group-report-submit">Submit report</button>
+          </div>
+        </form>
+      `,
+      onMount: (modalRoot, close) => {
+        qs("#group-report-cancel", modalRoot).addEventListener("click", close);
+        qs("#group-report-form", modalRoot).addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const selectEl = qs("#group-report-user", modalRoot);
+          const reportedId = selectEl ? Number(selectEl.value) : defaultTarget.id;
+          const reason = qs("#group-report-reason", modalRoot).value;
+          const rawDesc = qs("#group-report-desc", modalRoot).value.trim();
+          const feedback = qs("#group-report-feedback", modalRoot);
+          const submitBtn = qs("#group-report-submit", modalRoot);
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Submitting...";
+          feedback.hidden = true;
+          try {
+            await API.reportUser({
+              reported_user_id: reportedId,
+              reason,
+              description: rawDesc ? `[Group: ${groupName}] ${rawDesc}` : `Reported from group: ${groupName}`,
+            });
+            feedback.hidden = false;
+            feedback.className = "form-alert form-alert-success";
+            feedback.textContent = "Your report has been submitted for moderation review.";
+            submitBtn.hidden = true;
+            qs("#group-report-cancel", modalRoot).textContent = "Done";
+          } catch (err) {
+            feedback.hidden = false;
+            feedback.className = "form-alert form-alert-error";
+            feedback.textContent = err?.message || "Could not submit report.";
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Submit report";
+          }
+        });
+      },
+    });
+  });
 }
 
 export function openSafetyModal(targetUser, onBlocked) {
@@ -307,6 +720,7 @@ export function openSafetyModal(targetUser, onBlocked) {
 
         <form id="safety-report-form" class="stack-form">
           <h3>Report ${escapeHtml(fullName)}</h3>
+          <div id="safety-report-feedback" class="form-alert" hidden></div>
           <div class="field">
             <label for="report-reason">Reason</label>
             <select id="report-reason" required>${reasonsOptions}</select>
@@ -315,7 +729,7 @@ export function openSafetyModal(targetUser, onBlocked) {
             <label for="report-desc">Details (optional)</label>
             <textarea id="report-desc" rows="3" maxlength="1500" placeholder="Describe what happened so moderators can review..."></textarea>
           </div>
-          <button type="submit" class="btn btn-secondary">Submit report</button>
+          <button type="submit" class="btn btn-secondary" id="safety-report-submit">Submit report</button>
         </form>
 
         <div class="divider-line"></div>
@@ -332,16 +746,24 @@ export function openSafetyModal(targetUser, onBlocked) {
         ev.preventDefault();
         const reason = qs("#report-reason", root).value;
         const description = qs("#report-desc", root).value.trim();
+        const feedback = qs("#safety-report-feedback", root);
+        const submitBtn = qs("#safety-report-submit", root);
+        submitBtn.disabled = true;
         try {
           await API.reportUser({
             reported_user_id: targetUser.id,
             reason,
             description: description || null,
           });
-          showToast("Report submitted for moderation review.", "success");
-          close();
+          feedback.hidden = false;
+          feedback.className = "form-alert form-alert-success";
+          feedback.textContent = "Report submitted for moderation review.";
+          submitBtn.textContent = "Report submitted";
         } catch (err) {
-          showToast(err.message, "error");
+          feedback.hidden = false;
+          feedback.className = "form-alert form-alert-error";
+          feedback.textContent = err.message;
+          submitBtn.disabled = false;
         }
       });
 
@@ -354,7 +776,6 @@ export function openSafetyModal(targetUser, onBlocked) {
         }
         try {
           await API.blockUser(targetUser.id);
-          showToast(`${fullName} has been blocked.`, "success");
           close();
           if (typeof onBlocked === "function") onBlocked(targetUser.id);
         } catch (err) {

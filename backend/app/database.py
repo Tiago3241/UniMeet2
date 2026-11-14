@@ -57,6 +57,9 @@ def init_db() -> None:
             cols = {row[1] for row in conn.execute(text("PRAGMA table_info(users)"))}
             if cols and "demo_key" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN demo_key VARCHAR(50)"))
+            msg_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(messages)"))}
+            if msg_cols and "is_unsent" not in msg_cols:
+                conn.execute(text("ALTER TABLE messages ADD COLUMN is_unsent BOOLEAN NOT NULL DEFAULT 0"))
 
 
 def check_db_connection() -> bool:

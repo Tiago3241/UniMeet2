@@ -66,6 +66,20 @@ class Message(Base):
         DateTime(timezone=True), default=utc_now, nullable=False, index=True
     )
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_unsent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User")
+
+
+class MessageDeletion(Base):
+    __tablename__ = "message_deletions"
+
+    message_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+

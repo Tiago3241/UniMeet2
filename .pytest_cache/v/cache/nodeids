@@ -1,5 +1,6 @@
 [
   "backend/tests/test_auth_and_users.py::test_duplicate_registration_and_invalid_credentials",
+  "backend/tests/test_auth_and_users.py::test_forgot_and_reset_password_flow",
   "backend/tests/test_auth_and_users.py::test_profile_edit_interests_and_privacy",
   "backend/tests/test_auth_and_users.py::test_register_login_logout_and_me",
   "backend/tests/test_auth_and_users.py::test_reset_demo_account_defaults",
@@ -12,5 +13,6 @@
   "backend/tests/test_social_journeys.py::test_journey_a_and_d_matching_compatibility_and_websocket_chat",
   "backend/tests/test_social_journeys.py::test_journey_b_going_solo_and_expiry",
   "backend/tests/test_social_journeys.py::test_journey_c_groups_and_capacity",
-  "backend/tests/test_social_journeys.py::test_journey_e_blocking_reporting_and_community"
+  "backend/tests/test_social_journeys.py::test_journey_e_blocking_reporting_and_community",
+  "backend/tests/test_social_journeys.py::test_message_unsend_and_delete_for_me"
 ]

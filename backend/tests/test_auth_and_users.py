@@ -222,3 +222,41 @@ def test_user_hobbies_crud_and_discovery(client):
     disc_after = client.get("/api/users/discover", headers=headers2)
     clara_after = next((u for u in disc_after.json() if u["id"] == u1_id), None)
     assert clara_after["hobbies"] == ["Wheel Pottery", "Bouldering"]
+
+
+def test_forgot_and_reset_password_flow(client):
+    register_user(client, username="reset_user", email="reset@upt.ro", password="Password123!")
+
+    # Invalid email syntax rejected cleanly
+    bad_email = client.post("/api/auth/forgot-password", json={"email": "not-an-email"})
+    assert bad_email.status_code == 422
+
+    # Unknown email returns generic response without issuing token
+    unknown = client.post("/api/auth/forgot-password", json={"email": "nobody@upt.ro"})
+    assert unknown.status_code == 200
+    assert unknown.json()["reset_token"] is None
+
+    # Valid email generates single-use reset token
+    req = client.post("/api/auth/forgot-password", json={"email": "reset@upt.ro"})
+    assert req.status_code == 200
+    token = req.json()["reset_token"]
+    assert token
+
+    # Weak password rejected
+    weak = client.post("/api/auth/reset-password", json={"token": token, "new_password": "weak"})
+    assert weak.status_code == 422
+
+    # Reset succeeds and updates password
+    done = client.post("/api/auth/reset-password", json={"token": token, "new_password": "NewPassword456!"})
+    assert done.status_code == 200
+
+    # Reusing same token fails because password fingerprint changed
+    reused = client.post("/api/auth/reset-password", json={"token": token, "new_password": "AnotherPassword7!"})
+    assert reused.status_code == 400
+
+    # Old password fails, new password succeeds
+    old_login = client.post("/api/auth/login", json={"identifier": "reset@upt.ro", "password": "Password123!"})
+    assert old_login.status_code == 401
+    new_login = client.post("/api/auth/login", json={"identifier": "reset@upt.ro", "password": "NewPassword456!"})
+    assert new_login.status_code == 200
+

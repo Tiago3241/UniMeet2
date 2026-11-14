@@ -356,17 +356,23 @@ def like_event(
 
     if event.creator_id != current_user.id and not is_blocked_between(db, current_user.id, event.creator_id):
         conv = _find_or_create_event_conversation(db, current_user.id, event.creator_id, event.title)
-        db.add(
-            Message(
-                conversation_id=conv.id,
-                sender_id=event.creator_id,
-                content=(
-                    f'Hey {current_user.first_name}! Thanks for liking "{event.title}" in {event.city}. '
-                    f'Want to meet up near {event.location} before it starts?'
-                ),
-                is_read=False,
-            )
+        already_welcomed = (
+            db.query(Message)
+            .filter(Message.conversation_id == conv.id, Message.sender_id == event.creator_id)
+            .first()
         )
+        if not already_welcomed:
+            db.add(
+                Message(
+                    conversation_id=conv.id,
+                    sender_id=event.creator_id,
+                    content=(
+                        f'Hey {current_user.first_name}! Thanks for liking "{event.title}" in {event.city}. '
+                        f'Want to meet up near {event.location} before it starts?'
+                    ),
+                    is_read=False,
+                )
+            )
 
     db.commit()
     return event_to_out(db, event, current_user_id=current_user.id)

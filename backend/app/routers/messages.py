@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import SessionLocal, get_db
-from app.models.message import Conversation, ConversationParticipant, Message
+from app.models.group import Group
+from app.models.message import Conversation, ConversationParticipant, Message, MessageDeletion
 from app.models.user import User
 from app.schemas.social import (
     ConversationDetailOut,
@@ -20,11 +21,13 @@ from app.security.auth import (
     decode_access_token,
     get_current_user,
 )
-from app.services.serializers import is_blocked_between, user_to_public
+from app.services.serializers import get_blocked_user_ids, is_blocked_between, user_to_public
 from app.services.ws_manager import chat_manager
 
 router = APIRouter(tags=["Messaging"])
 settings = get_settings()
+
+UNSENT_PLACEHOLDER = "This message was unsent"
 
 
 def _verify_conversation_access(db: Session, conversation_id: int, user_id: int) -> Conversation:
@@ -66,8 +69,25 @@ def _verify_conversation_access(db: Session, conversation_id: int, user_id: int)
     return conv
 
 
+def _visible_messages_query(db: Session, conversation_id: int, user_id: int):
+    hidden_ids = [
+        row[0]
+        for row in db.query(MessageDeletion.message_id)
+        .filter(MessageDeletion.user_id == user_id)
+        .all()
+    ]
+    blocked_ids = get_blocked_user_ids(db, user_id)
+    query = db.query(Message).filter(Message.conversation_id == conversation_id)
+    if hidden_ids:
+        query = query.filter(~Message.id.in_(hidden_ids))
+    if blocked_ids:
+        query = query.filter(~Message.sender_id.in_(blocked_ids))
+    return query
+
+
 def _serialize_conversation(db: Session, conv: Conversation, current_user: User) -> ConversationOut:
     other_user_out = None
+    group_creator_id = None
     title = conv.title or "Direct Chat"
 
     if conv.group_id is None:
@@ -86,27 +106,25 @@ def _serialize_conversation(db: Session, conv: Conversation, current_user: User)
                 title = f"{other_name} · {conv.title[7:]}"
             else:
                 title = other_name
+    else:
+        grp = db.query(Group).filter(Group.id == conv.group_id).first()
+        if grp:
+            group_creator_id = grp.creator_id
 
-    last_msg = (
-        db.query(Message)
-        .filter(Message.conversation_id == conv.id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
-        .first()
-    )
+    visible_q = _visible_messages_query(db, conv.id, current_user.id)
+    last_msg = visible_q.order_by(Message.created_at.desc(), Message.id.desc()).first()
     unread_count = (
-        db.query(Message)
-        .filter(
-            Message.conversation_id == conv.id,
+        visible_q.filter(
             Message.sender_id != current_user.id,
             Message.is_read.is_(False),
-        )
-        .count()
+        ).count()
     )
 
     return ConversationOut(
         id=conv.id,
         match_id=conv.match_id,
         group_id=conv.group_id,
+        group_creator_id=group_creator_id,
         title=title,
         other_user=other_user_out,
         last_message=last_msg.content if last_msg else None,
@@ -171,8 +189,7 @@ def get_conversation_detail(
 ):
     conv = _verify_conversation_access(db, conversation_id, current_user.id)
     messages = (
-        db.query(Message)
-        .filter(Message.conversation_id == conv.id)
+        _visible_messages_query(db, conv.id, current_user.id)
         .order_by(Message.created_at.asc(), Message.id.asc())
         .all()
     )
@@ -207,6 +224,7 @@ async def send_message(
         sender_id=current_user.id,
         content=cleaned,
         is_read=False,
+        is_unsent=False,
     )
     db.add(msg)
     db.commit()
@@ -236,6 +254,64 @@ def mark_message_read(
     db.commit()
     db.refresh(msg)
     return MessageOut.model_validate(msg, from_attributes=True)
+
+
+@router.post("/messages/{message_id}/unsend", response_model=MessageOut, summary="Unsend own message for everyone")
+async def unsend_message(
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+
+    _verify_conversation_access(db, msg.conversation_id, current_user.id)
+    if msg.sender_id != current_user.id and not current_user.is_moderator:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only unsend messages that you sent.",
+        )
+
+    msg.is_unsent = True
+    msg.content = UNSENT_PLACEHOLDER
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    out = MessageOut.model_validate(msg, from_attributes=True)
+    await chat_manager.broadcast(
+        msg.conversation_id,
+        {"type": "message:unsent", "message": out.model_dump(mode="json")},
+    )
+    return out
+
+
+@router.post("/messages/{message_id}/delete-for-me", summary="Hide a message only for the current user")
+def delete_message_for_me(
+    message_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+
+    _verify_conversation_access(db, msg.conversation_id, current_user.id)
+    existing = (
+        db.query(MessageDeletion)
+        .filter(MessageDeletion.message_id == message_id, MessageDeletion.user_id == current_user.id)
+        .first()
+    )
+    if not existing:
+        db.add(MessageDeletion(message_id=message_id, user_id=current_user.id))
+        db.commit()
+
+    return {
+        "detail": "Message removed from your view.",
+        "message_id": message_id,
+        "conversation_id": msg.conversation_id,
+    }
 
 
 @router.delete("/messages/{message_id}", summary="Delete a message from a conversation")

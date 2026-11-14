@@ -1,5 +1,6 @@
 /**
  * Event discovery browser (events.html) and outing/Going Solo creation (create-event.html).
+ * Supports stateful heart like/unlike toggling and eliminates routine bottom-right toasts.
  */
 import { API } from "./api.js";
 import { CONFIG } from "./config.js";
@@ -19,8 +20,55 @@ const eventsState = {
   user: null,
   page: 1,
   limit: 9,
+  itemsById: new Map(),
   filters: { q: "", category: "", city: "", university: "", date: "" },
 };
+
+function heartSvg(filled) {
+  return filled
+    ? `<svg class="heart-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`
+    : `<svg class="heart-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+}
+
+function updateLikeButtonVisual(btn, isLiked, likeCount) {
+  if (!btn) return;
+  btn.classList.toggle("is-liked", Boolean(isLiked));
+  btn.dataset.liked = isLiked ? "true" : "false";
+  btn.setAttribute("aria-pressed", isLiked ? "true" : "false");
+  btn.setAttribute("aria-label", isLiked ? `Unlike event (${likeCount} likes)` : `Like event (${likeCount} likes)`);
+  btn.innerHTML = `${heartSvg(isLiked)}<span class="tabular-num">${likeCount}</span>`;
+}
+
+async function handleEventLikeToggle(eventId, btn) {
+  if (!eventsState.user) {
+    requireAuthenticatedUser();
+    return null;
+  }
+  if (btn.dataset.busy === "true") return null;
+
+  btn.dataset.busy = "true";
+  const currentlyLiked = btn.dataset.liked === "true";
+
+  try {
+    const updatedEv = currentlyLiked
+      ? await API.unlikeEvent(eventId)
+      : await API.likeEvent(eventId);
+    eventsState.itemsById.set(updatedEv.id, updatedEv);
+
+    // Sync any visible quick-like button for this event card in the grid
+    const cardBtn = qs(`[data-quick-like="${eventId}"]`);
+    if (cardBtn) {
+      updateLikeButtonVisual(cardBtn, updatedEv.is_liked, updatedEv.like_count);
+    }
+    updateLikeButtonVisual(btn, updatedEv.is_liked, updatedEv.like_count);
+    return updatedEv;
+  } catch (err) {
+    showToast(err.message || "Could not update like.", "error");
+    return null;
+  } finally {
+    delete btn.dataset.busy;
+  }
+}
 
 function populateCategories(selectEl, includeAll = true) {
   if (!selectEl) return;
@@ -36,6 +84,7 @@ async function openEventDetailsModal(eventId) {
       API.getEvent(eventId),
       API.getEventParticipants(eventId),
     ]);
+    eventsState.itemsById.set(ev.id, ev);
 
     const capText = ev.max_participants
       ? `${ev.participant_count} / ${ev.max_participants} participants`
@@ -79,8 +128,14 @@ async function openEventDetailsModal(eventId) {
             <button type="button" class="btn ${ev.is_joined ? "btn-secondary" : "btn-primary"}" id="modal-join-btn">
               ${ev.is_joined ? "Leave event" : "Join event"}
             </button>
-            <button type="button" class="btn btn-coral" id="modal-like-btn" ${ev.is_liked ? "disabled" : ""}>
-              ${ev.is_liked ? `Liked (${ev.like_count})` : `Like (${ev.like_count})`}
+            <button
+              type="button"
+              class="btn like-toggle-btn ${ev.is_liked ? "is-liked" : ""}"
+              id="modal-like-btn"
+              data-liked="${ev.is_liked ? "true" : "false"}"
+              aria-pressed="${ev.is_liked ? "true" : "false"}"
+            >
+              ${heartSvg(ev.is_liked)}<span class="tabular-num">${ev.like_count}</span>
             </button>
             ${
               isOwner
@@ -103,10 +158,8 @@ async function openEventDetailsModal(eventId) {
           try {
             if (ev.is_joined) {
               await API.leaveEvent(ev.id);
-              showToast("You left the event.", "info");
             } else {
               await API.joinEvent(ev.id);
-              showToast("Joined event!", "success");
             }
             close();
             loadEventsList();
@@ -115,19 +168,9 @@ async function openEventDetailsModal(eventId) {
           }
         });
 
-        qs("#modal-like-btn", root).addEventListener("click", async () => {
-          if (!eventsState.user) {
-            requireAuthenticatedUser();
-            return;
-          }
-          try {
-            await API.likeEvent(ev.id);
-            showToast("Saved to Matches & message received from creator!", "success");
-            close();
-            loadEventsList();
-          } catch (err) {
-            showToast(err.message, "error");
-          }
+        const modalLikeBtn = qs("#modal-like-btn", root);
+        modalLikeBtn.addEventListener("click", async () => {
+          await handleEventLikeToggle(ev.id, modalLikeBtn);
         });
 
         const delBtn = qs("#modal-delete-ev-btn", root);
@@ -140,7 +183,6 @@ async function openEventDetailsModal(eventId) {
             }
             try {
               await API.deleteEvent(ev.id);
-              showToast("Event deleted.", "success");
               close();
               loadEventsList();
             } catch (err) {
@@ -173,6 +215,9 @@ async function loadEventsList() {
       page: eventsState.page,
       limit: eventsState.limit,
     });
+
+    eventsState.itemsById.clear();
+    (res.items || []).forEach((ev) => eventsState.itemsById.set(ev.id, ev));
 
     if (!res.items.length) {
       container.innerHTML = `
@@ -207,8 +252,15 @@ async function loadEventsList() {
               <p>${escapeHtml(ev.description.slice(0, 120))}${ev.description.length > 120 ? "..." : ""}</p>
               <div class="card-actions">
                 <button type="button" class="btn btn-primary btn-sm" data-view-event="${ev.id}">Details &amp; Join</button>
-                <button type="button" class="btn btn-secondary btn-sm" data-quick-like="${ev.id}" ${ev.is_liked ? "disabled" : ""}>
-                  ${ev.is_liked ? `Liked (${ev.like_count})` : `Like (${ev.like_count})`}
+                <button
+                  type="button"
+                  class="btn btn-sm like-toggle-btn ${ev.is_liked ? "is-liked" : ""}"
+                  data-quick-like="${ev.id}"
+                  data-liked="${ev.is_liked ? "true" : "false"}"
+                  aria-pressed="${ev.is_liked ? "true" : "false"}"
+                  aria-label="${ev.is_liked ? `Unlike event (${ev.like_count} likes)` : `Like event (${ev.like_count} likes)`}"
+                >
+                  ${heartSvg(ev.is_liked)}<span class="tabular-num">${ev.like_count}</span>
                 </button>
               </div>
             </div>
@@ -223,17 +275,7 @@ async function loadEventsList() {
 
     qsa("[data-quick-like]", container).forEach((btn) => {
       btn.addEventListener("click", async () => {
-        if (!eventsState.user) {
-          requireAuthenticatedUser();
-          return;
-        }
-        try {
-          await API.likeEvent(Number(btn.dataset.quickLike));
-          showToast("Saved to Matches & creator messaged you!", "success");
-          loadEventsList();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
+        await handleEventLikeToggle(Number(btn.dataset.quickLike), btn);
       });
     });
 
@@ -311,10 +353,12 @@ async function initCreateEventPage() {
         image_url: presetSelect.value,
         description: qs("#ce-description").value.trim(),
       });
-      showToast(`"${created.title}" published! Check Messages for student replies.`, "success");
+      feedback.hidden = false;
+      feedback.className = "form-alert form-alert-success";
+      feedback.textContent = `"${created.title}" published! Redirecting to Events...`;
       window.setTimeout(() => {
         window.location.href = "events.html";
-      }, 800);
+      }, 650);
     } catch (err) {
       feedback.hidden = false;
       feedback.className = "form-alert form-alert-error";

@@ -113,6 +113,14 @@ export const API = {
   // Auth
   register: (data) => apiRequest("/auth/register", { method: "POST", body: JSON.stringify(data), skipAuthRedirect: true }),
   login: (data) => apiRequest("/auth/login", { method: "POST", body: JSON.stringify(data), skipAuthRedirect: true }),
+  forgotPassword: (email) =>
+    apiRequest("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }), skipAuthRedirect: true }),
+  resetPassword: (token, newPassword) =>
+    apiRequest("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password: newPassword }),
+      skipAuthRedirect: true,
+    }),
   logout: () => apiRequest("/auth/logout", { method: "POST", skipAuthRedirect: true }),
   me: (opts = {}) => apiRequest("/auth/me", opts),
 
@@ -198,6 +206,8 @@ export const API = {
       body: JSON.stringify({ content }),
     }),
   markMessageRead: (messageId) => apiRequest(`/messages/${messageId}/read`, { method: "PUT" }),
+  unsendMessage: (messageId) => apiRequest(`/messages/${messageId}/unsend`, { method: "POST" }),
+  deleteMessageForMe: (messageId) => apiRequest(`/messages/${messageId}/delete-for-me`, { method: "POST" }),
   deleteMessage: (messageId) => apiRequest(`/messages/${messageId}`, { method: "DELETE" }),
 
   // University Community

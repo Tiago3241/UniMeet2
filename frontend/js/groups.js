@@ -2,7 +2,15 @@
  * Student Groups, Going Solo Feed, and University Community Hub (groups.html).
  */
 import { API } from "./api.js";
-import { getCurrentUser, openPublicProfileModal, openSafetyModal, renderHobbyTags, requireAuthenticatedUser } from "./navigation.js";
+import {
+  buildGroupMenuHtml,
+  getCurrentUser,
+  openPublicProfileModal,
+  openSafetyModal,
+  renderHobbyTags,
+  requireAuthenticatedUser,
+  wireGroupMenuActions,
+} from "./navigation.js";
 import { escapeHtml, formatDateTime, getInitials, openModal, qs, qsa, showToast } from "./utils.js";
 
 const groupState = {
@@ -44,6 +52,7 @@ async function openGroupDetailsModal(group) {
 
     openModal({
       title: group.name,
+      headerActionsHtml: buildGroupMenuHtml(group, groupState.user),
       bodyHtml: `
         <div>
           <div class="meta-line">
@@ -83,14 +92,26 @@ async function openGroupDetailsModal(group) {
         </div>
       `,
       onMount: (root, close) => {
+        wireGroupMenuActions({
+          container: root,
+          groupId: group.id,
+          groupName: group.name,
+          creatorId: group.creator_id,
+          currentUser: groupState.user,
+          onLeft: () => {
+            close();
+            loadGroupsTab();
+          },
+          onBlocked: () => {
+            close();
+            loadGroupsTab();
+          },
+        });
+
         qs("#modal-join-grp", root)?.addEventListener("click", async () => {
           if (!groupState.user) return requireAuthenticatedUser();
           try {
-            const updated = await API.joinGroup(group.id);
-            showToast(
-              updated.membership_status === "pending" ? "Join request sent!" : "Joined group!",
-              "success"
-            );
+            await API.joinGroup(group.id);
             close();
             loadGroupsTab();
           } catch (err) {
@@ -101,7 +122,6 @@ async function openGroupDetailsModal(group) {
         qs("#modal-leave-grp", root)?.addEventListener("click", async () => {
           try {
             await API.leaveGroup(group.id);
-            showToast("Left group.", "info");
             close();
             loadGroupsTab();
           } catch (err) {
@@ -118,7 +138,6 @@ async function openGroupDetailsModal(group) {
           }
           try {
             await API.deleteGroup(group.id);
-            showToast("Group deleted.", "success");
             close();
             loadGroupsTab();
           } catch (err) {
@@ -130,7 +149,6 @@ async function openGroupDetailsModal(group) {
           btn.addEventListener("click", async () => {
             try {
               await API.approveGroupMember(group.id, Number(btn.dataset.approveUid));
-              showToast("Member approved!", "success");
               close();
               loadGroupsTab();
             } catch (err) {
@@ -218,7 +236,6 @@ async function openCreateGroupModal() {
             location: qs("#cg-city", root).value.trim() || null,
             interests_summary: qs("#cg-interests", root).value.trim() || null,
           });
-          showToast("Group created!", "success");
           close();
           groupState.activeTab = "groups";
           loadGroupsTab();
@@ -292,8 +309,7 @@ async function loadGroupsTab() {
         btn.addEventListener("click", async () => {
           if (!groupState.user) return requireAuthenticatedUser();
           try {
-            const res = await API.joinGroup(Number(btn.dataset.quickJoin));
-            showToast(res.membership_status === "pending" ? "Request sent!" : "Joined group!", "success");
+            await API.joinGroup(Number(btn.dataset.quickJoin));
             loadGroupsTab();
           } catch (err) {
             showToast(err.message, "error");
@@ -359,10 +375,7 @@ async function loadGroupsTab() {
           if (!groupState.user) return requireAuthenticatedUser();
           try {
             const res = await API.expressSoloInterest(Number(btn.dataset.soloInterest));
-            showToast("Connected! Opening chat...", "success");
-            window.setTimeout(() => {
-              window.location.href = `messages.html?conversation=${res.conversation_id}`;
-            }, 450);
+            window.location.href = `messages.html?conversation=${res.conversation_id}`;
           } catch (err) {
             showToast(err.message, "error");
           }
@@ -373,7 +386,6 @@ async function loadGroupsTab() {
         btn.addEventListener("click", async () => {
           try {
             await API.deleteSolo(Number(btn.dataset.deactivateSolo));
-            showToast("Going Solo post deactivated.", "info");
             loadGroupsTab();
           } catch (err) {
             showToast(err.message, "error");

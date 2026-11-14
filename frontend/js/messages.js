@@ -1,12 +1,26 @@
 /**
  * Real-time WebSocket + REST messaging interface (messages.html).
- * Uses short-lived WS connection tickets (no long-lived JWT in URL query strings),
- * handles disconnects/reconnects, shows live status, and confirms server persistence.
+ * Supports per-message three-dot menu (Unsend / Delete for me) with two-step
+ * confirmation modals, group three-dot options menu (Leave / Block / Report),
+ * live WebSocket sync, and clean visual feedback without routine toasts.
  */
 import { API } from "./api.js";
 import { CONFIG } from "./config.js";
-import { openSafetyModal, requireAuthenticatedUser } from "./navigation.js";
-import { escapeHtml, formatTimeShort, getInitials, qs, qsa, showToast } from "./utils.js";
+import {
+  buildGroupMenuHtml,
+  openSafetyModal,
+  requireAuthenticatedUser,
+  wireGroupMenuActions,
+} from "./navigation.js";
+import {
+  escapeHtml,
+  formatTimeShort,
+  getInitials,
+  openConfirmDialog,
+  qs,
+  qsa,
+  showToast,
+} from "./utils.js";
 
 const chatState = {
   user: null,
@@ -19,11 +33,24 @@ const chatState = {
   reconnectTimer: null,
 };
 
+const DOTS_ICON =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+
 function setWsStatus(label, cssClass = "") {
   const el = qs("#ws-status-label");
   if (!el) return;
   el.textContent = label;
   el.className = `muted-small ${cssClass}`;
+}
+
+function closeAllMessageMenus(exceptWrap = null) {
+  qsa(".options-menu-wrap[data-msg-menu]", qs("#chat-history")).forEach((wrap) => {
+    if (exceptWrap && wrap === exceptWrap) return;
+    const dd = qs(".options-dropdown", wrap);
+    const btn = qs(".options-dots-btn", wrap);
+    if (dd) dd.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  });
 }
 
 function renderConversationsList() {
@@ -97,6 +124,105 @@ function removeMessageBubble(messageId) {
   syncConversationPreview(chatState.activeConversationId);
 }
 
+function renderBubbleInner(msg, isMine) {
+  const canUnsend = isMine && !msg.is_unsent;
+  const contentHtml = msg.is_unsent
+    ? `<div class="chat-unsent-text">This message was unsent</div>`
+    : `<div>${escapeHtml(msg.content)}</div>`;
+
+  const menuHtml = `
+    <div class="options-menu-wrap" data-msg-menu="${msg.id}">
+      <button
+        type="button"
+        class="options-dots-btn"
+        data-msg-menu-trigger="${msg.id}"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-label="Message options"
+        title="Message options"
+      >${DOTS_ICON}</button>
+      <div class="options-dropdown" role="menu" hidden>
+        ${
+          canUnsend
+            ? `<button type="button" class="options-dropdown-item" role="menuitem" data-msg-action="unsend">Unsend</button>`
+            : ""
+        }
+        <button type="button" class="options-dropdown-item is-danger" role="menuitem" data-msg-action="delete-for-me">Delete for me</button>
+      </div>
+    </div>
+  `;
+
+  return `
+    ${contentHtml}
+    <div class="chat-meta tabular-num">
+      <span>${escapeHtml(formatTimeShort(msg.created_at))}${isMine ? (msg.is_read ? " · Read" : " · Sent") : ""}</span>
+      ${menuHtml}
+    </div>
+  `;
+}
+
+function wireBubbleMenu(bubble, msg) {
+  const wrap = qs(`[data-msg-menu="${msg.id}"]`, bubble);
+  if (!wrap) return;
+  const trigger = qs(`[data-msg-menu-trigger="${msg.id}"]`, wrap);
+  const dropdown = qs(".options-dropdown", wrap);
+
+  trigger?.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const shouldOpen = dropdown.hidden;
+    closeAllMessageMenus(wrap);
+    dropdown.hidden = !shouldOpen;
+    trigger.setAttribute("aria-expanded", String(shouldOpen));
+  });
+
+  qs('[data-msg-action="unsend"]', dropdown)?.addEventListener("click", () => {
+    closeAllMessageMenus();
+    openConfirmDialog({
+      title: "Unsend message?",
+      message: "This will remove the message for everyone in this conversation and replace it with an unsent notice.",
+      confirmLabel: "Unsend",
+      destructive: true,
+      onConfirm: async (close) => {
+        const updated = await API.unsendMessage(msg.id);
+        markBubbleUnsent(updated);
+        close();
+      },
+    });
+  });
+
+  qs('[data-msg-action="delete-for-me"]', dropdown)?.addEventListener("click", () => {
+    closeAllMessageMenus();
+    openConfirmDialog({
+      title: "Delete message for you?",
+      message: "This message will be removed only from your chat view. Other participants will still see it.",
+      confirmLabel: "Delete for me",
+      destructive: true,
+      onConfirm: async (close) => {
+        await API.deleteMessageForMe(msg.id);
+        removeMessageBubble(msg.id);
+        close();
+      },
+    });
+  });
+}
+
+function markBubbleUnsent(updatedMsg) {
+  const idx = chatState.activeMessages.findIndex((m) => m.id === updatedMsg.id);
+  if (idx !== -1) {
+    chatState.activeMessages[idx] = { ...chatState.activeMessages[idx], ...updatedMsg };
+  }
+  const historyEl = qs("#chat-history");
+  if (!historyEl) return;
+  const bubble = qs(`[data-message-id="${updatedMsg.id}"]`, historyEl);
+  if (bubble) {
+    const isMine = chatState.user && updatedMsg.sender_id === chatState.user.id;
+    bubble.className = `chat-bubble ${isMine ? "is-mine" : ""} is-unsent`;
+    bubble.innerHTML = renderBubbleInner(updatedMsg, isMine);
+    wireBubbleMenu(bubble, updatedMsg);
+  }
+  syncConversationPreview(chatState.activeConversationId);
+}
+
 function appendMessageBubble(msg) {
   if (chatState.renderedIds.has(msg.id)) return;
   chatState.renderedIds.add(msg.id);
@@ -108,40 +234,11 @@ function appendMessageBubble(msg) {
   if (empty) empty.remove();
 
   const isMine = chatState.user && msg.sender_id === chatState.user.id;
-  const canDelete =
-    isMine || !chatState.activeConversation?.group_id || Boolean(chatState.user?.is_moderator);
-
   const bubble = document.createElement("div");
-  bubble.className = `chat-bubble ${isMine ? "is-mine" : ""}`;
+  bubble.className = `chat-bubble ${isMine ? "is-mine" : ""} ${msg.is_unsent ? "is-unsent" : ""}`;
   bubble.dataset.messageId = String(msg.id);
-  bubble.innerHTML = `
-    <div>${escapeHtml(msg.content)}</div>
-    <div class="chat-meta tabular-num">
-      <span>${escapeHtml(formatTimeShort(msg.created_at))}${isMine ? (msg.is_read ? " · Read" : " · Sent") : ""}</span>
-      ${
-        canDelete
-          ? `<button type="button" class="msg-delete-btn" data-delete-message="${msg.id}" aria-label="Delete message">Delete</button>`
-          : ""
-      }
-    </div>
-  `;
-
-  const delBtn = qs("[data-delete-message]", bubble);
-  if (delBtn) {
-    delBtn.addEventListener("click", async () => {
-      delBtn.disabled = true;
-      delBtn.textContent = "Deleting...";
-      try {
-        await API.deleteMessage(msg.id);
-        removeMessageBubble(msg.id);
-        showToast("Message deleted.", "info");
-      } catch (err) {
-        delBtn.disabled = false;
-        delBtn.textContent = "Delete";
-        showToast(err.message || "Could not delete message.", "error");
-      }
-    });
-  }
+  bubble.innerHTML = renderBubbleInner(msg, isMine);
+  wireBubbleMenu(bubble, msg);
 
   historyEl.appendChild(bubble);
   historyEl.scrollTop = historyEl.scrollHeight;
@@ -196,6 +293,8 @@ async function connectWebSocket(conversationId) {
           conv.last_message_at = payload.message.created_at;
           renderConversationsList();
         }
+      } else if (payload.type === "message:unsent" && payload.message) {
+        markBubbleUnsent(payload.message);
       } else if (payload.type === "message:deleted" && payload.message_id) {
         removeMessageBubble(payload.message_id);
       } else if (payload.type === "error" && payload.detail) {
@@ -225,6 +324,7 @@ async function connectWebSocket(conversationId) {
 }
 
 async function selectConversation(conversationId) {
+  const loadSeq = (chatState.loadSeq = (chatState.loadSeq || 0) + 1);
   chatState.activeConversationId = conversationId;
   chatState.activeConversation = chatState.conversations.find((c) => c.id === conversationId) || null;
   chatState.renderedIds.clear();
@@ -238,12 +338,19 @@ async function selectConversation(conversationId) {
   const historyEl = qs("#chat-history");
   const composeForm = qs("#chat-compose-form");
 
+  composeForm.hidden = true;
   historyEl.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Loading messages...</p></div>`;
 
   try {
     const detail = await API.getConversation(conversationId);
+    if (chatState.loadSeq !== loadSeq) return;
     const conv = detail.conversation;
     chatState.activeConversation = conv;
+
+    const groupMenuHtml = conv.group_id
+      ? buildGroupMenuHtml({ is_member: true }, chatState.user)
+      : "";
+
     headerEl.innerHTML = `
       <div style="display:flex;align-items:center;gap:0.65rem;min-width:0;">
         <button type="button" class="chat-back-btn" id="chat-back-btn" aria-label="Back to conversations">&larr; Chats</button>
@@ -255,7 +362,7 @@ async function selectConversation(conversationId) {
       ${
         conv.other_user
           ? `<button type="button" class="btn btn-secondary btn-sm" id="chat-safety-btn">Safety</button>`
-          : ""
+          : groupMenuHtml
       }
     `;
 
@@ -270,6 +377,21 @@ async function selectConversation(conversationId) {
           window.location.reload();
         });
       });
+    } else if (conv.group_id) {
+      wireGroupMenuActions({
+        container: headerEl,
+        groupId: conv.group_id,
+        groupName: conv.title,
+        creatorId: conv.group_creator_id,
+        currentUser: chatState.user,
+        onLeft: () => {
+          closeActiveSocket();
+          window.location.href = "groups.html";
+        },
+        onBlocked: async () => {
+          await selectConversation(conversationId);
+        },
+      });
     }
 
     historyEl.innerHTML = "";
@@ -282,6 +404,7 @@ async function selectConversation(conversationId) {
     composeForm.hidden = false;
     await connectWebSocket(conversationId);
   } catch (err) {
+    if (chatState.loadSeq !== loadSeq) return;
     historyEl.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
     composeForm.hidden = true;
   }
@@ -291,6 +414,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (document.body?.dataset?.page !== "messages") return;
   chatState.user = await requireAuthenticatedUser();
   if (!chatState.user) return;
+
+  document.addEventListener("click", (ev) => {
+    if (!ev.target.closest("[data-msg-menu]")) {
+      closeAllMessageMenus();
+    }
+  });
 
   try {
     chatState.conversations = await API.listConversations();
@@ -316,7 +445,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     sendBtn.disabled = true;
     try {
-      // Send via REST endpoint so server persistence is explicitly confirmed (and WS broadcasts to room)
       const saved = await API.sendMessage(chatState.activeConversationId, content);
       appendMessageBubble(saved);
       input.value = "";

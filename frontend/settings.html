@@ -35,20 +35,20 @@
             <div class="theme-mode-grid" role="group" aria-label="Theme mode">
               <button type="button" class="theme-mode-card" id="theme-btn-light" data-theme-mode="light">
                 <div class="theme-preview-bar is-light" aria-hidden="true">
-                  <span class="theme-preview-dot" style="background:#1e4d3b;"></span>
+                  <span class="theme-preview-dot" style="background:var(--color-primary);"></span>
                   <span class="theme-preview-dot" style="background:var(--color-secondary);"></span>
                 </div>
                 <strong>Light Mode</strong>
-                <span class="muted-small">Warm stone canvas for daytime browsing</span>
+                <span class="muted-small">Warm daylight canvas paired to your palette</span>
               </button>
 
               <button type="button" class="theme-mode-card" id="theme-btn-dark" data-theme-mode="dark">
                 <div class="theme-preview-bar is-dark" aria-hidden="true">
-                  <span class="theme-preview-dot" style="background:#4da982;"></span>
+                  <span class="theme-preview-dot" style="background:var(--color-primary);"></span>
                   <span class="theme-preview-dot" style="background:var(--color-secondary);"></span>
                 </div>
                 <strong>Dark Mode</strong>
-                <span class="muted-small">Midnight pine surface for low-light outings</span>
+                <span class="muted-small">Deep evening surface for low-light outings</span>
               </button>
             </div>
           </div>
@@ -56,8 +56,9 @@
 
         <section class="card">
           <div class="card-body">
-            <h2>Secondary Color</h2>
-            <p class="muted-small" style="margin-bottom:1rem;">Updates badges, tabs, secondary buttons, active navigation highlights, avatars, and accents app-wide.</p>
+            <h2>Color Palette</h2>
+            <p class="muted-small" style="margin-bottom:0.45rem;">Pick a secondary accent color and UniMeet automatically pairs a matching primary color across buttons, navigation, and surfaces.</p>
+            <p class="muted-small" id="active-palette-label" style="margin-bottom:0.85rem;font-weight:600;color:var(--color-primary);"></p>
             <div class="color-swatch-grid" id="secondary-color-grid" role="group" aria-label="Secondary color"></div>
           </div>
         </section>
@@ -70,7 +71,7 @@
               <h2 style="margin:0;">Live Appearance Preview</h2>
               <span class="badge-inline">Festivals</span>
             </div>
-            <p class="muted-small" style="margin-bottom:1rem;">Secondary color changes apply live across navigation, tabs, badges, and buttons.</p>
+            <p class="muted-small" style="margin-bottom:1rem;">Paired primary and secondary colors update live across navigation, tabs, badges, and buttons.</p>
             <div class="card" style="padding:1.25rem;background:var(--color-bg-light);border-color:var(--color-secondary-border);">
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
                 <div style="display:flex;align-items:center;gap:0.85rem;">
@@ -102,6 +103,7 @@
             <div class="safety-tips-box" id="demo-account-status" style="margin-bottom:1rem;">
               Checking active session...
             </div>
+            <div id="demo-reset-feedback" class="form-alert" hidden style="margin-bottom:1rem;"></div>
             <div class="card-actions" style="margin-top:0;">
               <button type="button" class="btn btn-coral" id="reset-demo-account-btn" disabled>Reset Demo Account to Defaults</button>
               <a href="profile.html" class="btn btn-secondary">Edit User Data</a>

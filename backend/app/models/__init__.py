@@ -4,7 +4,7 @@ from app.models.event import Event, EventLike, EventParticipant, SoloInterest, S
 from app.models.group import Group, GroupMember
 from app.models.interest import Interest, UserInterest
 from app.models.match import Match, UserLike
-from app.models.message import Conversation, ConversationParticipant, Message
+from app.models.message import Conversation, ConversationParticipant, Message, MessageDeletion
 from app.models.report import Report
 from app.models.user import Block, User, UserHobby
 
@@ -26,5 +26,6 @@ __all__ = [
     "Conversation",
     "ConversationParticipant",
     "Message",
+    "MessageDeletion",
     "Report",
 ]

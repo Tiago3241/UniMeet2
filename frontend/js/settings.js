@@ -1,10 +1,11 @@
 /**
- * Settings screen controller: Light/Dark mode switching, secondary color selection,
- * and resetting the demo account back to its default data.
+ * Settings screen controller: Light/Dark mode switching, dynamic harmonious
+ * primary + secondary color pair selection, and resetting the demo account.
  */
 import { API } from "./api.js";
 import { getCurrentUser, renderDashboardShell } from "./navigation.js";
 import {
+  getActivePalette,
   getThemePreferences,
   resetThemePreferences,
   SECONDARY_COLORS,
@@ -34,6 +35,7 @@ function renderDemoAccountSection(user) {
 
 function renderSettingsUI() {
   const { mode, secondaryId } = getThemePreferences();
+  const palette = getActivePalette({ mode, secondaryId });
 
   qsa("[data-theme-mode]").forEach((btn) => {
     const active = btn.dataset.themeMode === mode;
@@ -41,10 +43,16 @@ function renderSettingsUI() {
     btn.setAttribute("aria-pressed", String(active));
   });
 
+  const activePairLabel = qs("#active-palette-label");
+  if (activePairLabel) {
+    activePairLabel.textContent = `Active palette: ${palette.swatch.pairLabel}`;
+  }
+
   const grid = qs("#secondary-color-grid");
   if (grid) {
     grid.innerHTML = SECONDARY_COLORS.map((swatch) => {
       const active = swatch.id === secondaryId;
+      const primaryDot = mode === "dark" ? swatch.primary.dark : swatch.primary.light;
       return `
         <button
           type="button"
@@ -52,18 +60,22 @@ function renderSettingsUI() {
           data-secondary-id="${escapeHtml(swatch.id)}"
           aria-pressed="${active ? "true" : "false"}"
         >
-          <span class="color-swatch-circle" style="background:${escapeHtml(swatch.hex)};"></span>
-          <span>${escapeHtml(swatch.name)}</span>
+          <span class="color-swatch-pair" aria-hidden="true">
+            <span class="color-swatch-circle" style="background:${escapeHtml(swatch.hex)};"></span>
+            <span class="color-swatch-circle is-primary-dot" style="background:${escapeHtml(primaryDot)};"></span>
+          </span>
+          <span class="color-swatch-meta">
+            <span>${escapeHtml(swatch.name)}</span>
+            <span class="color-swatch-pair-sub">${escapeHtml(swatch.pairLabel)}</span>
+          </span>
         </button>
       `;
     }).join("");
 
     qsa("[data-secondary-id]", grid).forEach((btn) => {
       btn.addEventListener("click", () => {
-        const updated = setSecondaryColor(btn.dataset.secondaryId);
+        setSecondaryColor(btn.dataset.secondaryId);
         renderSettingsUI();
-        const chosen = SECONDARY_COLORS.find((c) => c.id === updated.secondaryId);
-        showToast(`Secondary color set to ${chosen ? chosen.name : updated.secondaryId}.`, "success");
       });
     });
   }
@@ -74,16 +86,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   qsa("[data-theme-mode]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const next = setThemeMode(btn.dataset.themeMode);
+      setThemeMode(btn.dataset.themeMode);
       renderSettingsUI();
-      showToast(`Switched to ${next.mode === "dark" ? "Dark" : "Light"} mode.`, "success");
     });
   });
 
   qs("#settings-reset-btn")?.addEventListener("click", () => {
     resetThemePreferences();
     renderSettingsUI();
-    showToast("Appearance reset to default Light mode & Coral Flame.", "info");
   });
 
   const user = await getCurrentUser(true);
@@ -94,11 +104,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     resetDemoBtn.disabled = true;
     const originalText = resetDemoBtn.textContent;
     resetDemoBtn.textContent = "Resetting...";
+    const feedbackEl = qs("#demo-reset-feedback");
+    if (feedbackEl) feedbackEl.hidden = true;
     try {
       const restored = await API.resetDemoAccount();
       renderDashboardShell(restored);
       renderDemoAccountSection(restored);
-      showToast(`Demo account restored to defaults (@${restored.username}).`, "success");
+      if (feedbackEl) {
+        feedbackEl.hidden = false;
+        feedbackEl.className = "form-alert form-alert-success";
+        feedbackEl.textContent = `Demo account restored to defaults (@${restored.username}).`;
+      }
     } catch (err) {
       showToast(err.message || "Could not reset demo account.", "error");
     } finally {

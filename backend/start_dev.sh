@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOST="0.0.0.0"
-PORT="${PORT:-3000}"
+PORT="${DEFAULT_APP_PORT:-3000}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,27 +35,14 @@ cd "$ROOT_DIR"
 export PYTHONPATH="${ROOT_DIR}/backend"
 export DATABASE_URL="${DATABASE_URL:-sqlite:///${ROOT_DIR}/backend/unimeet.db}"
 
-VENV_PY="${ROOT_DIR}/backend/.venv/bin/python"
-VENV_UVICORN="${ROOT_DIR}/backend/.venv/bin/uvicorn"
+VENV_DIR="${ROOT_DIR}/backend/.venv"
+VENV_PY="${VENV_DIR}/bin/python"
+VENV_UVICORN="${VENV_DIR}/bin/uvicorn"
 
-if [[ ! -x "$VENV_UVICORN" ]]; then
-  if python3 -m virtualenv "${ROOT_DIR}/backend/.venv" >/dev/null 2>&1; then
-    :
-  elif python3 -m venv "${ROOT_DIR}/backend/.venv" >/dev/null 2>&1; then
-    :
-  else
-    rm -rf "${ROOT_DIR}/backend/.venv"
-    python3 -c "import urllib.request; urllib.request.urlretrieve('https://bootstrap.pypa.io/get-pip.py', '/tmp/get-pip.py')"
-    python3 /tmp/get-pip.py --no-cache-dir
-    rm -f /tmp/get-pip.py
-    python3 -m pip install --no-cache-dir virtualenv
-    python3 -m virtualenv "${ROOT_DIR}/backend/.venv"
-  fi
-  "${VENV_PY}" -m pip install --no-cache-dir -r "${ROOT_DIR}/backend/requirements.txt"
-fi
+bash "${ROOT_DIR}/backend/ensure_venv.sh"
 
 # Ensure schema & demo data exist on first boot in non-production environments
-if [[ "${ENVIRONMENT:-development}" != "production" ]]; then
+if [[ "${ENVIRONMENT:-development}" != "production" && ! -s "${ROOT_DIR}/backend/unimeet.db" ]]; then
   "${VENV_PY}" -m app.seed >/dev/null 2>&1 || true
 fi
 
