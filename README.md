@@ -132,6 +132,6 @@ PYTHONPATH=backend backend/.venv/bin/pytest backend/tests -v
 
 ## Team Contributions
 
-- **Developer 1**: FastAPI architecture, SQLite + 16 SQLAlchemy models, Argon2/JWT/CSRF authentication, user profiles, events API, demo seeding, and backend tests.
-- **Developer 2**: Design system, responsive landing page, auth forms, dashboard shell, swipe discovery UI, event browser, profile editor, and centralized API client.
-- **Developer 3**: Individual matching, public/private groups, Going Solo expiration workflow, explainable compatibility scoring, real-time WebSocket chat, university community, safety/moderation, end-to-end integration, and documentation.
+- **Opre Matei**: FastAPI architecture, SQLite + 16 SQLAlchemy models, Argon2/JWT/CSRF authentication, user profiles, events API, demo seeding, and backend tests.
+- **Mureșan Tiago**: Design system, responsive landing page, auth forms, dashboard shell, swipe discovery UI, event browser, profile editor, and centralized API client.
+- **Oprișor Radu**: Individual matching, public/private groups, Going Solo expiration workflow, explainable compatibility scoring, real-time WebSocket chat, university community, safety/moderation, end-to-end integration, and documentation.
